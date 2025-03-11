@@ -1,10 +1,8 @@
 import streamlit as st
 import pandas as pd
 import os
-import json
 from datetime import datetime
 from pathlib import Path
-import tempfile
 
 # ページ設定
 st.set_page_config(
@@ -24,8 +22,7 @@ if "saved_items" not in st.session_state:
     st.session_state.saved_items = []
 
 # データディレクトリの確認・作成
-# クラウド環境でも動作するように一時ディレクトリを使用
-DATA_DIR = Path(tempfile.gettempdir()) / "12jou_tenken_app_data"
+DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
 INSPECTION_DATA_PATH = DATA_DIR / "inspection_data.csv"
