@@ -4,6 +4,7 @@ import os
 import json
 from datetime import datetime
 from pathlib import Path
+import tempfile
 
 # ページ設定
 st.set_page_config(
@@ -23,8 +24,21 @@ if "saved_items" not in st.session_state:
     st.session_state.saved_items = []
 
 # データディレクトリの確認・作成
-DATA_DIR = Path("data")
-DATA_DIR.mkdir(exist_ok=True)
+# ローカル環境とクラウド環境の両方で動作するようにする
+try:
+    # まずローカルの「data」ディレクトリを試す
+    DATA_DIR = Path("data")
+    DATA_DIR.mkdir(exist_ok=True)
+    # テスト書き込みを試みる
+    test_file = DATA_DIR / "test.txt"
+    test_file.write_text("test")
+    test_file.unlink()  # テストファイルを削除
+except (PermissionError, OSError):
+    # 書き込み権限がない場合は一時ディレクトリを使用
+    DATA_DIR = Path(tempfile.gettempdir()) / "12jou_tenken_app_data"
+    DATA_DIR.mkdir(exist_ok=True)
+    st.warning(f"データディレクトリに書き込み権限がないため、一時ディレクトリを使用します: {DATA_DIR}")
+
 INSPECTION_DATA_PATH = DATA_DIR / "inspection_data.csv"
 LOCATION_MASTER_PATH = DATA_DIR / "location_master.csv"
 DETERIORATION_MASTER_PATH = DATA_DIR / "deterioration_master.csv"
@@ -45,7 +59,10 @@ def load_master_data(file_path, default_data=None):
         else:
             if default_data:
                 df = pd.DataFrame(default_data)
-                df.to_csv(file_path, encoding="shift_jis", index=False)
+                try:
+                    df.to_csv(file_path, encoding="shift_jis", index=False)
+                except Exception as e:
+                    st.warning(f"マスターデータの保存に失敗しました: {e}")
                 return df
             return pd.DataFrame()
     except Exception as e:
