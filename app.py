@@ -24,54 +24,39 @@ if "saved_items" not in st.session_state:
     st.session_state.saved_items = []
 
 # データディレクトリの確認・作成
-# ローカル環境とクラウド環境の両方で動作するようにする
-try:
-    # まずローカルの「data」ディレクトリを試す
-    DATA_DIR = Path("data")
-    DATA_DIR.mkdir(exist_ok=True)
-    # テスト書き込みを試みる
-    test_file = DATA_DIR / "test.txt"
-    test_file.write_text("test")
-    test_file.unlink()  # テストファイルを削除
-except (PermissionError, OSError):
-    # 書き込み権限がない場合は一時ディレクトリを使用
-    DATA_DIR = Path(tempfile.gettempdir()) / "12jou_tenken_app_data"
-    DATA_DIR.mkdir(exist_ok=True)
-    st.warning(f"データディレクトリに書き込み権限がないため、一時ディレクトリを使用します: {DATA_DIR}")
+# クラウド環境でも動作するように一時ディレクトリを使用
+DATA_DIR = Path(tempfile.gettempdir()) / "12jou_tenken_app_data"
+DATA_DIR.mkdir(exist_ok=True)
 
 INSPECTION_DATA_PATH = DATA_DIR / "inspection_data.csv"
 LOCATION_MASTER_PATH = DATA_DIR / "location_master.csv"
 DETERIORATION_MASTER_PATH = DATA_DIR / "deterioration_master.csv"
 
+# デフォルトのマスターデータ
+default_locations = {"場所": ["1階廊下", "2階廊下", "屋上", "外壁", "階段", "玄関", "機械室", "駐車場"]}
+default_deteriorations = {"劣化名": ["ひび割れ", "剥離", "漏水", "腐食", "変形", "欠損", "さび", "変色"]}
+
 # マスターデータの読み込み
 def load_master_data(file_path, default_data=None):
     try:
         if file_path.exists():
-            # 複数のエンコーディングを試行
-            encodings = ['shift_jis', 'utf-8', 'cp932', 'utf-8-sig']
-            for encoding in encodings:
-                try:
-                    return pd.read_csv(file_path, encoding=encoding)
-                except UnicodeDecodeError:
-                    continue
-            st.error(f"マスターデータの読み込みに失敗しました: {file_path}")
-            return pd.DataFrame()
+            try:
+                return pd.read_csv(file_path, encoding="utf-8")
+            except Exception as e:
+                st.error(f"マスターデータの読み込みエラー: {e}")
+                return pd.DataFrame(default_data) if default_data else pd.DataFrame()
         else:
             if default_data:
                 df = pd.DataFrame(default_data)
                 try:
-                    df.to_csv(file_path, encoding="shift_jis", index=False)
+                    df.to_csv(file_path, encoding="utf-8", index=False)
                 except Exception as e:
                     st.warning(f"マスターデータの保存に失敗しました: {e}")
                 return df
             return pd.DataFrame()
     except Exception as e:
-        st.error(f"マスターデータの読み込みエラー: {e}")
-        return pd.DataFrame()
-
-# デフォルトのマスターデータ
-default_locations = {"場所": ["1階廊下", "2階廊下", "屋上", "外壁", "階段", "玄関", "機械室", "駐車場"]}
-default_deteriorations = {"劣化名": ["ひび割れ", "剥離", "漏水", "腐食", "変形", "欠損", "さび", "変色"]}
+        st.error(f"マスターデータの処理エラー: {e}")
+        return pd.DataFrame(default_data) if default_data else pd.DataFrame()
 
 # マスターデータの読み込み
 location_master = load_master_data(LOCATION_MASTER_PATH, default_locations)
@@ -81,18 +66,14 @@ deterioration_master = load_master_data(DETERIORATION_MASTER_PATH, default_deter
 def load_inspection_data():
     try:
         if INSPECTION_DATA_PATH.exists():
-            # 複数のエンコーディングを試行
-            encodings = ['utf-8-sig', 'utf-8', 'shift_jis', 'cp932']
-            for encoding in encodings:
-                try:
-                    return pd.read_csv(INSPECTION_DATA_PATH, encoding=encoding)
-                except UnicodeDecodeError:
-                    continue
-            st.error(f"点検データの読み込みに失敗しました")
-            return pd.DataFrame()
+            try:
+                return pd.read_csv(INSPECTION_DATA_PATH, encoding="utf-8")
+            except Exception as e:
+                st.error(f"点検データの読み込みエラー: {e}")
+                return pd.DataFrame()
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"点検データの読み込みエラー: {e}")
+        st.error(f"点検データの処理エラー: {e}")
         return pd.DataFrame()
 
 # 劣化項目の追加
@@ -177,7 +158,7 @@ def save_inspection_data():
         # 既存データとの結合
         if INSPECTION_DATA_PATH.exists():
             try:
-                df_existing = pd.read_csv(INSPECTION_DATA_PATH, encoding="utf-8-sig")
+                df_existing = pd.read_csv(INSPECTION_DATA_PATH, encoding="utf-8")
                 df_save = pd.concat([df_existing, df_save], ignore_index=True)
             except Exception as e:
                 st.error(f"既存データの読み込み中にエラーが発生しました: {e}")
@@ -185,7 +166,7 @@ def save_inspection_data():
         
         # CSVファイルへの保存
         try:
-            df_save.to_csv(INSPECTION_DATA_PATH, encoding="utf-8-sig", index=False)
+            df_save.to_csv(INSPECTION_DATA_PATH, encoding="utf-8", index=False)
             
             # 保存済みリストを更新
             st.session_state.saved_items.extend(newly_saved_items)
@@ -385,7 +366,7 @@ def main():
             st.dataframe(filtered_data, use_container_width=True)
             
             # CSVダウンロード機能
-            csv_data = filtered_data.to_csv(index=False, encoding="utf-8-sig")
+            csv_data = filtered_data.to_csv(index=False, encoding="utf-8")
             st.download_button(
                 label="CSVダウンロード",
                 data=csv_data,
